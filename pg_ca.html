@@ -6,16 +6,16 @@
 </head>
 <body>
 
-<canvas id="myCanvas" width="400" height="200" style="border:1px solid #d3d3d3;">
+<canvas id="myCanvas" width="100" height="100" style="border:1px solid #d3d3d3;">
 您的浏览器不支持 HTML5 canvas 标签。</canvas><br/>
 
 <button onclick="startCa()">开始/重置</button>
 <button onclick="stopCa()">暂停/继续</button>
 
 <script>
-var CELL_RADIUS = 20;
-var CELL_ROW = 10;
-var CELL_COL = 10;
+var CELL_RADIUS = 40;
+var CELL_ROW = 5;
+var CELL_COL = 5;
 var COLOR_PALETTE = ["white", "green"]; //0: 白色（死）, 1: 绿色（生）
 
 var LIFE_NUM = [0, 0, NaN, 1, 0, 0, 0, 0, 0]; //周围cell的数量决定下回合状态，0表示无条件死，1表示无条件生，NaN在这里用来表示不改变状态（代码里做处理）
@@ -25,10 +25,10 @@ function drawCell(context, indexX, indexY, statusCrt, statusNxt){
     var posY = (indexY * 2 + 1) * CELL_RADIUS;
     var colorCrt = COLOR_PALETTE[statusCrt];
     var colorNxt = COLOR_PALETTE[statusNxt];
-    //用中心颜色代表当前状态，周围渐变色代表趋势——即将到来的状态
+    //用中心颜色代表趋势，周围代表当前
     var gradient = context.createRadialGradient(posX, posY, CELL_RADIUS/3, posX, posY, CELL_RADIUS);
-    gradient.addColorStop(0, colorCrt);
-    gradient.addColorStop(1, colorNxt);
+    gradient.addColorStop(0, colorNxt);
+    gradient.addColorStop(1, colorCrt);
     context.fillStyle = gradient;
     context.beginPath();
     context.arc(posX, posY, CELL_RADIUS, 0, 2*Math.PI);
@@ -61,7 +61,7 @@ function initCells(cellsCurrent, cellsNext){
     copyCells(cellsCurrent, cellsNext);
 }
 
-function updateCells(){
+function updateCells(cellsCurrent, cellsNext){
     copyCells(cellsNext, cellsCurrent); //更新当前状态，现在current里面存放的已经是新的状态了，接下来计算next状态
     
     for (var i=0; i<CELL_ROW; i++){
@@ -73,13 +73,11 @@ function updateCells(){
                 }
             }
             sum -= cellsCurrent[i][j];
-            if (!isNaN(LIFE_NUM[sum])):
-            cellsNext[i][j] = LIFE_NUM[sum]; 
+            if (!isNaN(LIFE_NUM[sum])){
+                cellsNext[i][j] = LIFE_NUM[sum]; 
+            }
          }
      }
-}
-
-function flushCells(){
 }
 
 function startCa(){
@@ -87,7 +85,9 @@ function startCa(){
     drawCells(ctx, cellsCrt, cellsNxt);
 }
 
-function updateCa(){
+function stopCa(){
+    updateCells(cellsCrt, cellsNxt);
+    drawCells(ctx, cellsCrt, cellsNxt);
 }
 
 // -- MAIN --
@@ -119,6 +119,7 @@ for (var i=0; i<CELL_ROW; i++){
     }
 }
 
+var timer;
 
 </script>
 

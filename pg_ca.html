@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head> 
+<meta charset="utf-8"> 
+<title>[PlayGround]元胞自动机</title> 
+</head>
+<body>
+
+<canvas id="myCanvas" width="400" height="200" style="border:1px solid #d3d3d3;">
+您的浏览器不支持 HTML5 canvas 标签。</canvas><br/>
+
+<button onclick="startCa()">开始/重置</button>
+<button onclick="stopCa()">暂停/继续</button>
+
+<script>
+var CELL_RADIUS = 20;
+var CELL_ROW = 10;
+var CELL_COL = 10;
+var COLOR_PALETTE = ["white", "green"]; //0: 白色（死）, 1: 绿色（生）
+
+var LIFE_NUM = [0, 0, NaN, 1, 0, 0, 0, 0, 0]; //周围cell的数量决定下回合状态，0表示无条件死，1表示无条件生，NaN在这里用来表示不改变状态（代码里做处理）
+
+function drawCell(context, indexX, indexY, statusCrt, statusNxt){
+    var posX = (indexX * 2 + 1) * CELL_RADIUS;
+    var posY = (indexY * 2 + 1) * CELL_RADIUS;
+    var colorCrt = COLOR_PALETTE[statusCrt];
+    var colorNxt = COLOR_PALETTE[statusNxt];
+    //用中心颜色代表当前状态，周围渐变色代表趋势——即将到来的状态
+    var gradient = context.createRadialGradient(posX, posY, CELL_RADIUS/3, posX, posY, CELL_RADIUS);
+    gradient.addColorStop(0, colorCrt);
+    gradient.addColorStop(1, colorNxt);
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.arc(posX, posY, CELL_RADIUS, 0, 2*Math.PI);
+    context.fill();
+}
+
+function drawCells(context, cellsCurrent, cellsNext){
+    for (var i=0; i<CELL_ROW; i++){
+        for (var j=0; j<CELL_COL; j++){
+            drawCell(context, i, j, cellsCurrent[i][j], cellsNext[i][j]);
+        }
+    }
+}
+
+function copyCells(cellsA, cellsB){
+    for (var i=0; i<CELL_ROW; i++){
+        for (var j=0; j<CELL_COL; j++){
+            cellsB[i][j] = cellsA[i][j];
+            //console.log(i, j);
+        }
+    }
+}
+
+function initCells(cellsCurrent, cellsNext){
+    for (var i=0; i<CELL_ROW; i++){
+        for (var j=0; j<CELL_COL; j++){
+            cellsCurrent[i][j] = Math.round(Math.random());
+        }
+    } 
+    copyCells(cellsCurrent, cellsNext);
+}
+
+function updateCells(){
+    copyCells(cellsNext, cellsCurrent); //更新当前状态，现在current里面存放的已经是新的状态了，接下来计算next状态
+    
+    for (var i=0; i<CELL_ROW; i++){
+        for (var j=0; j<CELL_COL; j++){
+            var sum = 0;
+            for (var k=Math.max(0, i-1); k<Math.min(CELL_ROW, i+2); k++){
+                for (var l=Math.max(0, j-1); l<Math.min(CELL_COL, j+2); l++){
+                    sum += cellsCurrent[k][l];
+                }
+            }
+            sum -= cellsCurrent[i][j];
+            if (!isNaN(LIFE_NUM[sum])):
+            cellsNext[i][j] = LIFE_NUM[sum]; 
+         }
+     }
+}
+
+function flushCells(){
+}
+
+function startCa(){
+    initCells(cellsCrt, cellsNxt);
+    drawCells(ctx, cellsCrt, cellsNxt);
+}
+
+function updateCa(){
+}
+
+// -- MAIN --
+//根据自定义内容重绘画布
+var c=document.getElementById("myCanvas");
+c.width = (CELL_RADIUS*CELL_ROW*2).toString();
+c.height= (CELL_RADIUS*CELL_COL*2).toString();
+
+
+var ctx=c.getContext("2d");
+
+//测试单元格绘制功能
+/*
+drawCell(ctx, 0, 0, 0, 0);	
+drawCell(ctx, 0, 1, 0, 1);	
+drawCell(ctx, 1, 0, 1, 0);	
+drawCell(ctx, 1, 1, 1, 1);	
+*/
+
+//存放状态的二维数组
+var cellsCrt = new Array();
+var cellsNxt = new Array();
+for (var i=0; i<CELL_ROW; i++){
+    cellsCrt[i] = new Array();
+    cellsNxt[i] = new Array();
+    for (var j=0; j<CELL_COL; j++){
+        cellsCrt[i][j] = 0;
+        cellsNxt[i][j] = 0;
+    }
+}
+
+
+</script>
+
+</body>
+</html>

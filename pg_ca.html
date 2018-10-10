@@ -13,9 +13,9 @@
 <button onclick="stopCa()">暂停/继续</button>
 
 <script>
-var CELL_RADIUS = 40;
-var CELL_ROW = 5;
-var CELL_COL = 5;
+var CELL_RADIUS = 50;
+var CELL_ROW = 8;
+var CELL_COL = 8;
 var COLOR_PALETTE = ["white", "green"]; //0: 白色（死）, 1: 绿色（生）
 
 var LIFE_NUM = [0, 0, NaN, 1, 0, 0, 0, 0, 0]; //周围cell的数量决定下回合状态，0表示无条件死，1表示无条件生，NaN在这里用来表示不改变状态（代码里做处理）

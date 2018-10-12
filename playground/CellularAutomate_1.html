@@ -6,84 +6,111 @@
 </head>
 <body>
 
+<div>
 <canvas id="myCanvas" width="100" height="100" style="border:1px solid #d3d3d3;">
 您的浏览器不支持 HTML5 canvas 标签。</canvas><br/>
+</div>
 
+<div>
 <button type="button" style="width:300px; height:100px; font-size:60px" onclick="startCa()">开始</button>
 <button type="button" style="width:300px; height:100px; font-size:60px" onclick="autoCa()">自动</button>
-<button type="button" style="width:300px; height:100px; font-size:60px" onclick="stepCa()">继续</button><br/>
+<button type="button" style="width:300px; height:100px; font-size:60px" onclick="stepCa()">继续</button>
+</div>
 
-<p id="round" style="width:450px; height:100px; font-size:60px; border:1px solid #d3d3d3;">回合</p>
-
-<!--
-<select name="radius" style="width:450px; height:100px; font-size:50px">
+<div>
+<select id="size" style="width:450px; height:100px; font-size:60px">
+    <option value="5">5</option>
     <option value="10">10</option>
     <option value="15">15</option>
     <option value="30">30</option>
     <option value="60">60</option>
+    <option value="120">120</option>
 </select>
--->
+<b id="round" style="width:450px; height:100px; font-size:60px;">回合</b>
+</div>
 
 <script>
-var WINDOW_WIDTH = 960;
-var WINDOW_HEIGHT = 960;
-var CELL_RADIUS = 15;
-var CELL_ROW = Math.round(WINDOW_WIDTH / CELL_RADIUS / 2);
-var CELL_COL = Math.round(WINDOW_HEIGHT / CELL_RADIUS / 2);
+var WINDOW_SIZE = 960;
 var TIME_INTERVAL = 0.2 * 1000;
 var COLOR_PALETTE = ["white", "black"]; //0: 白色（死）, 1: 黑色（生）
 var LIFE_NUM = [0, 0, NaN, 1, 0, 0, 0, 0, 0]; //周围cell的数量决定下回合状态，0表示无条件死，1表示无条件生，NaN在这里用来表示不改变状态（代码里做处理）
 
-function drawCell(context, indexX, indexY, statusCrt, statusNxt){
-    var posX = (indexX * 2 + 1) * CELL_RADIUS;
-    var posY = (indexY * 2 + 1) * CELL_RADIUS;
+// -- MAIN --
+//根据自定义内容重绘画布
+var c=document.getElementById("myCanvas");
+c.width = WINDOW_SIZE.toString();
+c.height= WINDOW_SIZE.toString();
+var context=c.getContext("2d");
+
+//存放状态的二维数组
+var cellsCurrent;
+var cellsNext;
+//定时器
+var timer;
+//回合计数
+var round;
+//格子尺寸
+var cell_radius;
+var cell_size;
+
+function drawCell(indexX, indexY, statusCrt, statusNxt){
+    var posX = (indexX * 2 + 1) * cell_radius;
+    var posY = (indexY * 2 + 1) * cell_radius;
     var colorCrt = COLOR_PALETTE[statusCrt];
     var colorNxt = COLOR_PALETTE[statusNxt];
     //用中心颜色代表趋势，周围代表当前
-    var gradient = context.createRadialGradient(posX, posY, CELL_RADIUS/3, posX, posY, CELL_RADIUS);
+    var gradient = context.createRadialGradient(posX, posY, cell_radius/3, posX, posY, cell_radius);
     gradient.addColorStop(0, colorNxt);
     gradient.addColorStop(1, colorCrt);
     context.fillStyle = gradient;
     context.beginPath();
-    context.arc(posX, posY, CELL_RADIUS, 0, 2*Math.PI);
+    context.arc(posX, posY, cell_radius, 0, 2*Math.PI);
     context.fill();
 }
 
-function drawCells(context, cellsCurrent, cellsNext){
-    context.clearRect(0,0,WINDOW_WIDTH,WINDOW_HEIGHT);
-    for (var i=0; i<CELL_ROW; i++){
-        for (var j=0; j<CELL_COL; j++){
-            drawCell(context, i, j, cellsCurrent[i][j], cellsNext[i][j]);
+function drawCells(){
+    context.clearRect(0,0,WINDOW_SIZE,WINDOW_SIZE);
+    for (var i=0; i<cell_size; i++){
+        for (var j=0; j<cell_size; j++){
+            drawCell(i, j, cellsCurrent[i][j], cellsNext[i][j]);
         }
     }
 }
 
-function copyCells(cellsA, cellsB){
-    for (var i=0; i<CELL_ROW; i++){
-        for (var j=0; j<CELL_COL; j++){
-            cellsB[i][j] = cellsA[i][j];
+function initCells(){
+    var myselect=document.getElementById("size");
+    var index=myselect.selectedIndex; 
+    //console.log(myselect.options[index].value);
+
+    cell_size = myselect.options[index].value; 
+    console.assert(cell_size > 0 && cell_size <= WINDOW_SIZE, "Size不符合要求");
+    cell_radius = Math.round(WINDOW_SIZE / cell_size / 2);
+
+    cellsCurrent = new Array();
+    cellsNext = new Array();
+    for (var i=0; i<cell_size; i++){
+        cellsCurrent[i] = new Array();
+        cellsNext[i] = new Array();
+        for (var j=0; j<cell_size; j++){
+            cellsCurrent[i][j] = Math.round(Math.random());
+            cellsNext[i][j] = cellsCurrent[i][j];
+        }
+    }
+}
+
+function updateCells(){
+    for (var i=0; i<cell_size; i++){
+        for (var j=0; j<cell_size; j++){
+            cellsCurrent[i][j] = cellsNext[i][j];
             //console.log(i, j);
         }
     }
-}
-
-function initCells(cellsCurrent, cellsNext){
-    for (var i=0; i<CELL_ROW; i++){
-        for (var j=0; j<CELL_COL; j++){
-            cellsCurrent[i][j] = Math.round(Math.random());
-        }
-    } 
-    copyCells(cellsCurrent, cellsNext);
-}
-
-function updateCells(cellsCurrent, cellsNext){
-    copyCells(cellsNext, cellsCurrent); //更新当前状态，现在current里面存放的已经是新的状态了，接下来计算next状态
     
-    for (var i=0; i<CELL_ROW; i++){
-        for (var j=0; j<CELL_COL; j++){
+    for (var i=0; i<cell_size; i++){
+        for (var j=0; j<cell_size; j++){
             var sum = 0;
-            for (var k=Math.max(0, i-1); k<Math.min(CELL_ROW, i+2); k++){
-                for (var l=Math.max(0, j-1); l<Math.min(CELL_COL, j+2); l++){
+            for (var k=Math.max(0, i-1); k<Math.min(cell_size, i+2); k++){
+                for (var l=Math.max(0, j-1); l<Math.min(cell_size, j+2); l++){
                     sum += cellsCurrent[k][l];
                 }
             }
@@ -96,16 +123,16 @@ function updateCells(cellsCurrent, cellsNext){
 }
 
 function startCa(){
-    initCells(cellsCrt, cellsNxt);
-    drawCells(ctx, cellsCrt, cellsNxt);
+    initCells();
+    drawCells();
     round = 0
 }
 
 function stepCa(){
-    updateCells(cellsCrt, cellsNxt);
-    drawCells(ctx, cellsCrt, cellsNxt);
+    updateCells();
+    drawCells();
     round += 1;
-    document.getElementById("round").innerHTML = round.toString();
+    document.getElementById("round").innerHTML = "回合： " + round.toString();
 }
 
 function autoCa(){
@@ -117,37 +144,6 @@ function autoCa(){
         timer = undefined;
     }
 }
-
-// -- MAIN --
-//根据自定义内容重绘画布
-var c=document.getElementById("myCanvas");
-c.width = WINDOW_WIDTH.toString();
-c.height= WINDOW_HEIGHT.toString();
-var ctx=c.getContext("2d");
-
-//测试单元格绘制功能
-/*
-drawCell(ctx, 0, 0, 0, 0);	
-drawCell(ctx, 0, 1, 0, 1);	
-drawCell(ctx, 1, 0, 1, 0);	
-drawCell(ctx, 1, 1, 1, 1);	
-*/
-
-//存放状态的二维数组
-var cellsCrt = new Array();
-var cellsNxt = new Array();
-for (var i=0; i<CELL_ROW; i++){
-    cellsCrt[i] = new Array();
-    cellsNxt[i] = new Array();
-    for (var j=0; j<CELL_COL; j++){
-        cellsCrt[i][j] = 0;
-        cellsNxt[i][j] = 0;
-    }
-}
-
-var timer;
-var round;
-
 </script>
 
 </body>

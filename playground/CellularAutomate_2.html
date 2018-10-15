@@ -2,108 +2,148 @@
 <html>
 <head> 
 <meta charset="utf-8"> 
-<title>[PlayGround]元胞自动机-一维时间轴</title> 
+<title>[PlayGround]元胞自动机-一维状态机</title> 
 </head>
 <body>
 
-<canvas id="myCanvas" width="100" height="100" style="border:1px solid #d3d3d3;">
+<div>
+<canvas id="myCanvas" width="960" height="960" style="border:1px solid #d3d3d3;">
 您的浏览器不支持 HTML5 canvas 标签。</canvas><br/>
+</div>
 
+<div>
 <button type="button" style="width:300px; height:100px; font-size:60px" onclick="startCa()">开始</button>
 <button type="button" style="width:300px; height:100px; font-size:60px" onclick="autoCa()">自动</button>
-<button type="button" style="width:300px; height:100px; font-size:60px" onclick="stepCa()">继续</button><br/>
+<button type="button" style="width:300px; height:100px; font-size:60px" onclick="stepCa()">继续</button>
+</div>
 
-<p id="round" style="width:450px; height:100px; font-size:60px; border:1px solid #d3d3d3;">回合</p>
+<div>
+<b style="width:450px; height:100px; font-size:60px;">规则</b>
+<input type="text" id="rule" value="0" style="width:300px; height:100px; font-size:60px"></input>
+<b style="width:450px; height:100px; font-size:60px;">种子</b>
+<input type="text" id="seed" value="0.5" style="width:300px; height:100px; font-size:60px"></input>
+</div>
 
-<!--
-<select name="radius" style="width:450px; height:100px; font-size:50px">
-    <option value="10">10</option>
-    <option value="15">15</option>
-    <option value="30">30</option>
-    <option value="60">60</option>
+<div>
+<select id="size" style="width:430px; height:100px; font-size:60px">
+    <option value="5">每行 5 个</option>
+    <option value="10">每行 10 个</option>
+    <option value="15">每行 15 个</option>
+    <option value="30">每行 30 个</option>
+    <option value="60">每行 60 个</option>
+    <option value="120">每行 120 个</option>
 </select>
--->
+<b style="width:450px; height:100px; font-size:60px;">回合</b>
+<b id="round" style="width:450px; height:100px; font-size:60px;"></b>
+</div>
 
 <script>
-var WINDOW_WIDTH = 960;
-var WINDOW_HEIGHT = 960;
-var CELL_RADIUS = 15;
-var CELL_ROW = Math.round(WINDOW_WIDTH / CELL_RADIUS / 2);
-var CELL_COL = Math.round(WINDOW_HEIGHT / CELL_RADIUS / 2);
+var WINDOW_SIZE = 960;
 var TIME_INTERVAL = 0.2 * 1000;
-var COLOR_PALETTE = ["white", "black"]; //0: 白色（死）, 1: 黑色（生）
-var LIFE_NUM = [0, 0, NaN, 1, 0, 0, 0, 0, 0]; //周围cell的数量决定下回合状态，0表示无条件死，1表示无条件生，NaN在这里用来表示不改变状态（代码里做处理）
 
-function drawCell(context, indexX, indexY, statusCrt, statusNxt){
-    var posX = (indexX * 2 + 1) * CELL_RADIUS;
-    var posY = (indexY * 2 + 1) * CELL_RADIUS;
-    var colorCrt = COLOR_PALETTE[statusCrt];
-    var colorNxt = COLOR_PALETTE[statusNxt];
-    //用中心颜色代表趋势，周围代表当前
-    var gradient = context.createRadialGradient(posX, posY, CELL_RADIUS/3, posX, posY, CELL_RADIUS);
-    gradient.addColorStop(0, colorNxt);
-    gradient.addColorStop(1, colorCrt);
-    context.fillStyle = gradient;
+// -- MAIN --
+//根据自定义内容重绘画布
+var c=document.getElementById("myCanvas");
+c.width = WINDOW_SIZE.toString();
+c.height= WINDOW_SIZE.toString();
+var context=c.getContext("2d");
+
+//存放状态的二维数组
+var cellsCurrent;
+//定时器
+var timer;
+//回合计数
+var round;
+var rule;
+//格子尺寸
+var cell_radius;
+var cell_size;
+
+function drawCell(indexX, indexY, statusCrt){
+    var posX = (indexX * 2 + 1) * cell_radius;
+    var posY = (indexY * 2 + 1) * cell_radius;
     context.beginPath();
-    context.arc(posX, posY, CELL_RADIUS, 0, 2*Math.PI);
-    context.fill();
+    context.arc(posX, posY, cell_radius, 0, 2*Math.PI);
+    if (statusCrt > 0){
+        context.fill();
+    }
+    else{
+        context.stroke();
+    }
 }
 
-function drawCells(context, cellsCurrent, cellsNext){
-    context.clearRect(0,0,WINDOW_WIDTH,WINDOW_HEIGHT);
-    for (var i=0; i<CELL_ROW; i++){
-        for (var j=0; j<CELL_COL; j++){
-            drawCell(context, i, j, cellsCurrent[i][j], cellsNext[i][j]);
+function drawCells(){
+    context.clearRect(0,0,WINDOW_SIZE,WINDOW_SIZE);
+    for (var i=0; i<cell_size; i++){
+        for (var j=0; j<cell_size; j++){
+            drawCell(i, j, cellsCurrent[i][j]);
         }
     }
 }
 
-function copyCells(cellsA, cellsB){
-    for (var i=0; i<CELL_ROW; i++){
-        for (var j=0; j<CELL_COL; j++){
-            cellsB[i][j] = cellsA[i][j];
+function initCells(){
+    var myselect=document.getElementById("size");
+    var index=myselect.selectedIndex; 
+    //console.log(myselect.options[index].value);
+
+    cell_size = myselect.options[index].value; 
+    console.assert(cell_size > 0 && cell_size <= WINDOW_SIZE, "Size不符合要求");
+    cell_radius = Math.round(WINDOW_SIZE / cell_size / 2);
+
+    var seed = document.getElementById("seed").value;
+    console.log(seed);
+
+    cellsCurrent = new Array();
+    for (var i=0; i<cell_size; i++){
+        cellsCurrent[i] = new Array();
+        for (var j=0; j<cell_size; j++){
+            cellsCurrent[i][j] = 0;
+        }
+    }
+    for (var j=0; j<cell_size; j++){
+        cellsCurrent[0][j] = (Math.random() < seed)?1:0;
+    }
+}
+
+function updateCells(){
+    for (var i=cell_size-1; i>0; i--){
+        for (var j=0; j<cell_size; j++){
+            cellsCurrent[i][j] = cellsCurrent[i-1][j];
             //console.log(i, j);
         }
     }
-}
-
-function initCells(cellsCurrent, cellsNext){
-    for (var i=0; i<CELL_ROW; i++){
-        for (var j=0; j<CELL_COL; j++){
-            cellsCurrent[i][j] = Math.round(Math.random());
-        }
-    } 
-    copyCells(cellsCurrent, cellsNext);
-}
-
-function updateCells(cellsCurrent, cellsNext){
-    copyCells(cellsNext, cellsCurrent); //更新当前状态，现在current里面存放的已经是新的状态了，接下来计算next状态
     
-    for (var i=0; i<CELL_ROW; i++){
-        for (var j=0; j<CELL_COL; j++){
-            var sum = 0;
-            for (var k=Math.max(0, i-1); k<Math.min(CELL_ROW, i+2); k++){
-                for (var l=Math.max(0, j-1); l<Math.min(CELL_COL, j+2); l++){
-                    sum += cellsCurrent[k][l];
-                }
-            }
-            sum -= cellsCurrent[i][j];
-            if (!isNaN(LIFE_NUM[sum])){
-                cellsNext[i][j] = LIFE_NUM[sum]; 
-            }
-         }
-     }
+    for (var j=0; j<cell_size; j++){
+        var temp = 0;
+        if (j == 0){
+            temp = cellsCurrent[1][j]<<1 | cellsCurrent[1][j+1]<<2;
+        }
+        else if (j == cell_size-1){
+            temp = cellsCurrent[1][j-1] | cellsCurrent[1][j]<<1;
+        }
+        else{
+            temp = cellsCurrent[1][j-1] | cellsCurrent[1][j]<<1 | cellsCurrent[1][j+1]<<2;
+        }
+        cellsCurrent[0][j] = mapValue(temp);
+    }
+}
+
+function mapValue(triStatus){
+    console.assert((triStatus >= 0 && triStatus < 8), "组合超出范围");
+    //console.log(rule, triStatus, (rule>>triStatus)&1);
+    return (rule>>triStatus)&1;
 }
 
 function startCa(){
-    initCells(cellsCrt, cellsNxt);
-    drawCells(ctx, cellsCrt, cellsNxt);
+    initCells();
+    drawCells();
     round = 0
 }
 
 function stepCa(){
-    updateCells(cellsCrt, cellsNxt);
-    drawCells(ctx, cellsCrt, cellsNxt);
+    rule = document.getElementById("rule").value;
+    updateCells();
+    drawCells();
     round += 1;
     document.getElementById("round").innerHTML = round.toString();
 }
@@ -117,37 +157,6 @@ function autoCa(){
         timer = undefined;
     }
 }
-
-// -- MAIN --
-//根据自定义内容重绘画布
-var c=document.getElementById("myCanvas");
-c.width = WINDOW_WIDTH.toString();
-c.height= WINDOW_HEIGHT.toString();
-var ctx=c.getContext("2d");
-
-//测试单元格绘制功能
-/*
-drawCell(ctx, 0, 0, 0, 0);	
-drawCell(ctx, 0, 1, 0, 1);	
-drawCell(ctx, 1, 0, 1, 0);	
-drawCell(ctx, 1, 1, 1, 1);	
-*/
-
-//存放状态的二维数组
-var cellsCrt = new Array();
-var cellsNxt = new Array();
-for (var i=0; i<CELL_ROW; i++){
-    cellsCrt[i] = new Array();
-    cellsNxt[i] = new Array();
-    for (var j=0; j<CELL_COL; j++){
-        cellsCrt[i][j] = 0;
-        cellsNxt[i][j] = 0;
-    }
-}
-
-var timer;
-var round;
-
 </script>
 
 </body>

@@ -19,7 +19,7 @@
 
 <div>
 <b style="width:300px; height:100px; font-size:60px;">随机</b>
-<input type="text" id="rand" value="0.4" style="width:150px; height:100px; font-size:60px"></input>
+<input type="text" id="rand" value="0.1" style="width:150px; height:100px; font-size:60px"></input>
 <b id="round" style="width:450px; height:100px; font-size:60px;">回合</b></br>
 <select id="size" style="width:450px; height:100px; font-size:60px">
     <option value="5">每行 5 个</option>
@@ -35,7 +35,7 @@
 var WINDOW_SIZE = 960;
 var TIME_INTERVAL = 0.2 * 1000;
 var COLOR_PALETTE = ["white", "black"]; //0: 白色（死）, 1: 黑色（生）
-var LIFE_NUM = [0, 0, NaN, 1, NaN, 0, 0]; //周围cell的数量决定下回合状态，0表示无条件死，1表示无条件生，NaN在这里用来表示不改变状态（代码里做处理）
+var LIFE_NUM = [0, 0, 0.75, 1, 0.25, 0, 0]; //周围cell的数量决定下回合状态，0表示无条件死，1表示无条件生，NaN在这里用来表示不改变状态（代码里做处理）
 
 // -- MAIN --
 //根据自定义内容重绘画布
@@ -55,7 +55,7 @@ var round;
 var cell_radius;
 var cell_size;
 var cell_size_h;
-var gen_rand = 0.4
+var gen_rand = 0.1 //设为0时为原始生存游戏规则，大于0表示在原来为0时有概率生成新细胞
 
 function drawCell(indexX, indexY, statusCrt, statusNxt){
     var posX;
@@ -150,11 +150,20 @@ function updateCells(){
                 if (i+1 < cell_size && j+1 < cell_size_h)
                     sum += cellsCurrent[i+1][j+1];
             }
-            if (!isNaN(LIFE_NUM[sum])){
-                cellsNext[i][j] = LIFE_NUM[sum]; 
+            if (LIFE_NUM[sum] == 0.75){
+                if (cellsCurrent[i][j] == 0)
+                    cellsNext[i][j] = (Math.random()<gen_rand)?1:0;
+                else
+                    cellsNext[i][j] = 1
+            }
+            else if (LIFE_NUM[sum] == 0.25){
+                if (cellsCurrent[i][j] == 0)
+                    cellsNext[i][j] = (Math.random()<gen_rand)?1:0;
+                else
+                    cellsNext[i][j] = 0
             }
             else {
-                cellsNext[i][j] = (Math.random()<gen_rand)?1:0;
+                cellsNext[i][j] = LIFE_NUM[sum]; 
             }
          }
      }

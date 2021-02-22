@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<head> 
+<meta charset="utf-8"> 
+<title>[PlayGround]糖人实验</title> 
+</head>
+<body>
+
+<div id=canvas style="float:left;">
+<canvas id="myCanvas" width="100" height="100" style="border:1px solid #d3d3d3;">
+您的浏览器不支持 HTML5 canvas 标签。</canvas><br/>
+</div>
+
+<div id=menu style="float:left;">
+<button type="button" style="width:300px; height:100px; font-size:60px" onclick="startCa()">开始</button>
+<button type="button" style="width:300px; height:100px; font-size:60px" onclick="autoCa()">自动</button>
+<button type="button" style="width:300px; height:100px; font-size:60px" onclick="stepCa()">单步</button>
+<button type="button" style="width:300px; height:100px; font-size:60px" onclick="updateCa()">更新</button>
+<br>
+<b style="width:300px; height:100px; font-size:60px;">种子</b>
+<input type="text" id="seed" value="150" style="width:150px; height:100px; font-size:60px"></input>
+<br>
+<!--
+<select id="size" style="width:450px; height:100px; font-size:60px">
+    <option value="50">每行 50 个</option>
+    <option value="100">每行 100 个</option>
+</select><br>
+-->
+<b id="round" style="width:450px; height:100px; font-size:60px;">回合</b><br>
+<b id="alive" style="width:450px; height:100px; font-size:60px;">存活</b><br>
+<b id="coord" style="width:450px; height:100px; font-size:60px;">坐标</b><br>
+<b id="vision" style="width:450px; height:100px; font-size:60px;">视野</b><br>
+<b id="consume" style="width:450px; height:100px; font-size:60px;">消耗</b><br>
+<b id="life" style="width:450px; height:100px; font-size:60px;">生命</b><br>
+<b id="age" style="width:450px; height:100px; font-size:60px;">年龄</b><br>
+<b id="wealth" style="width:450px; height:100px; font-size:60px;">财富</b><br>
+</div>
+
+<script>
+var WINDOW_SIZE = 1200;
+var TIME_INTERVAL = 0.2 * 1000;
+var COLOR_PALETTE_SUGAR = ["#FFFFFF", "#D0D0D0", "#A0A0A0", "#606060", "#202020"]; //从白色（无糖）开始，糖逐渐增多
+var SUGAR_CENTER_NUM = 2;
+var SUGAR_CENTER_RADIUS = 300;
+var PEOPLE_VISION_LEVEL = 6;
+var PEOPLE_CONSUME_LEVEL = 4;
+var PEOPLE_INIT_LIFE = 100;
+var CONTINUE_WHEN_BALANCE = 1;
+var ENABLE_OLD = 0;
+
+// -- MAIN --
+//根据自定义内容重绘画布
+var c=document.getElementById("myCanvas");
+c.width = WINDOW_SIZE.toString();
+c.height= WINDOW_SIZE.toString();
+var context=c.getContext("2d");
+
+//存放状态的二维数组
+var cellsSugar;
+var cellsPeople;
+var listPeople;
+
+//定时器
+var timer;
+//回合计数
+var round;
+var alive;
+//格子尺寸
+var cell_radius;
+var cell_size;
+
+
+c.onmousedown = function(ev) {
+	var ev = ev || window.event;
+	offsetX = ev.clientX-c.offsetLeft;
+	offsetY = ev.clientY-c.offsetTop;
+	posX = Math.floor(offsetX / (2*cell_radius));
+	posY = Math.floor(offsetY / (2*cell_radius));
+	context.moveTo(offsetX,offsetY);
+	
+	//探测到当前鼠标点下的posX,posY
+	if (cellsPeople[posX][posY].exist == 1){
+		document.getElementById("coord").innerHTML = "坐标： " + posX.toString() + " " + posY.toString();
+		document.getElementById("vision").innerHTML = "视野： " + listPeople[cellsPeople[posX][posY].id].vision.toString();
+		document.getElementById("consume").innerHTML = "消耗： " + listPeople[cellsPeople[posX][posY].id].consume.toString();
+		document.getElementById("life").innerHTML = "生命： " + listPeople[cellsPeople[posX][posY].id].life.toString();
+		document.getElementById("age").innerHTML = "年龄： " + listPeople[cellsPeople[posX][posY].id].age.toString();
+		document.getElementById("wealth").innerHTML = "财富： " + listPeople[cellsPeople[posX][posY].id].wealth.toString();
+	}
+	else {
+		document.getElementById("coord").innerHTML = "坐标";
+		document.getElementById("vision").innerHTML = "视野";
+		document.getElementById("consume").innerHTML = "消耗";
+		document.getElementById("life").innerHTML = "生命";
+		document.getElementById("age").innerHTML = "年龄";
+		document.getElementById("wealth").innerHTML = "财富";
+	}
+	
+	c.onmouseup = function(){
+		document.onmouseup = null;
+	};
+};
+
+function getRandom(m, n){
+	return Math.floor(Math.random()*(n-m)+m);
+}
+
+function getRandomColor(m, n){
+    return '#'+getRandom(m, n).toString(16)+getRandom(m, n).toString(16)+getRandom(m, n).toString(16);
+}
+
+function getDedicatedColor(vision, consume){
+	return '#' + Math.floor(vision*255/PEOPLE_VISION_LEVEL).toString(16) + '00' + Math.floor((PEOPLE_CONSUME_LEVEL+1-consume)*255/PEOPLE_CONSUME_LEVEL).toString(16);
+}
+	
+function drawCell(posX, posY, ColorIn, ColorOut){
+    var offsetX = (posX * 2 + 1) * cell_radius;
+    var offsetY = (posY * 2 + 1) * cell_radius;
+	
+	//画外圈
+    var gradient = context.createRadialGradient(offsetX, offsetY, cell_radius/3, offsetX, offsetY, cell_radius);
+    gradient.addColorStop(0, ColorOut);
+    gradient.addColorStop(1, ColorOut);
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.arc(offsetX, offsetY, cell_radius, 0, 2*Math.PI);
+    context.fill();
+	
+	//画内圈
+	var gradient = context.createRadialGradient(offsetX, offsetY, cell_radius/10, offsetX, offsetY, cell_radius/3);
+    gradient.addColorStop(0, ColorIn);
+    gradient.addColorStop(1, ColorIn);
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.arc(offsetX, offsetY, cell_radius/3, 0, 2*Math.PI);
+    context.fill();
+}
+
+function drawCells(){
+    context.clearRect(0,0,WINDOW_SIZE,WINDOW_SIZE);
+    for (var i=0; i<cell_size; i++){
+        for (var j=0; j<cell_size; j++){
+            drawCell(i, j, cellsPeople[i][j].color, cellsSugar[i][j].color);
+        }
+    }
+}
+
+function initCells(){
+    //var myselect=document.getElementById("size");
+    //var index=myselect.selectedIndex; 
+    //console.log(myselect.options[index].value);
+    //cell_size = myselect.options[index].value; 
+	cell_size = 50;
+    console.assert(cell_size > 0 && cell_size <= WINDOW_SIZE, "Size不符合要求");
+    cell_radius = Math.round(WINDOW_SIZE / cell_size / 2);
+	
+    cellsSugar = new Array();
+    cellsPeople = new Array();
+	listPeople = new Array();
+    for (var i=0; i<cell_size; i++){
+        cellsSugar[i] = new Array();
+        cellsPeople[i] = new Array();
+        for (var j=0; j<cell_size; j++){
+            cellsSugar[i][j] = {volume:0, color:"white"};
+            cellsPeople[i][j] = {exist:0, color:"white", id:-1};
+        }
+    }
+}
+
+function initSugar(){
+	//糖中心
+	var sugarCenters = new Array();
+	for (var k=0; k<SUGAR_CENTER_NUM; k++){
+		sugarCenters[k] = {posX:getRandom(0, cell_size), posY:getRandom(0, cell_size), radius:getRandom(SUGAR_CENTER_RADIUS/2, SUGAR_CENTER_RADIUS)};
+		for (var i=0; i<cell_size; i++){
+			for (var j=0; j<cell_size; j++){
+				sugarDensity = Math.floor(5 * Math.sqrt(Math.pow(i-sugarCenters[k].posX, 2) + Math.pow(j-sugarCenters[k].posY, 2)) * cell_radius / sugarCenters[k].radius);
+				//console.log(sugarDensity);
+				if (sugarDensity < 5){
+					cellsSugar[i][j].volume += 4-sugarDensity; //甜度有四级
+					if (cellsSugar[i][j].volume > 4){
+						cellsSugar[i][j].volume = 4;
+					}
+					cellsSugar[i][j].color = COLOR_PALETTE_SUGAR[cellsSugar[i][j].volume];
+				}
+			}
+		}
+	}
+}
+
+function updatePeople(){
+	var seed = parseInt(document.getElementById("seed").value);
+	numPeople = listPeople.length;
+	//console.log(seed, numPeople);
+
+	for (k=numPeople; k<numPeople + seed; k++){
+		listPeople[k] = {id:k, color:"white", vision:getRandom(1, PEOPLE_VISION_LEVEL+1), consume:getRandom(1, PEOPLE_CONSUME_LEVEL+1), life: PEOPLE_INIT_LIFE, age:0, wealth:0, posX:0, posY:0};
+		listPeople[k].color = getDedicatedColor(listPeople[k].vision, listPeople[k].consume);
+		console.log(listPeople[k]);
+		do{
+			listPeople[k].posX = getRandom(0, cell_size);
+			listPeople[k].posY = getRandom(0, cell_size);
+		}while(cellsPeople[listPeople[k].posX][listPeople[k].posY].exist != 0);
+		cellsPeople[listPeople[k].posX][listPeople[k].posY].exist = 1;
+		cellsPeople[listPeople[k].posX][listPeople[k].posY].color = listPeople[k].color;
+		cellsPeople[listPeople[k].posX][listPeople[k].posY].id = listPeople[k].id;
+		//console.log(cellsPeople[listPeople[k].posX][listPeople[k].posY].color);
+	}
+}
+
+function findSugar(posX, posY, vision){
+	//console.log(posX, posY, vision);
+
+	var direction = {deltaX:0, deltaY:0};
+	var sugarMax = 0;
+	var sugarMaxList = new Array;
+	
+	//找出范围内最高的糖点
+	for (i=Math.max(0, posX - vision); i<=Math.min(cell_size-1, posX + vision); i++){
+		var deltaX = Math.abs(i - posX);
+		for (j=Math.max(0, posY - (vision - deltaX)); j<=Math.min(cell_size-1, posY + (vision - deltaX)); j++){
+			if (cellsSugar[i][j].volume > sugarMax){
+				sugarMax = cellsSugar[i][j].volume;
+				sugarMaxList.length = 0;
+				sugarMaxList[0] = {posX:i, posY:j};
+				//console.log(sugarMax);
+				//console.log(sugarMaxList[0]);
+			}
+			else if (cellsSugar[i][j].volume == sugarMax){
+				sugarMaxList.push({posX:i, posY:j});
+			}
+		}
+	}
+	
+	//console.log(sugarMax);
+	//console.log(sugarMaxList);
+	target = sugarMaxList[getRandom(0, sugarMaxList.length)];
+	//console.log(target);
+	
+	
+	//随机决定横着走还是竖着走
+	choise = getRandom(0,2);
+	var deltaX = 0; 
+	var deltaY = 0;
+	if (target.posX != posX){
+		if (target.posX < posX && cellsPeople[posX-1][posY].exist == 0){
+			deltaX = -1;
+		}
+		else if (target.posX > posX && cellsPeople[posX+1][posY].exist == 0){
+			deltaX = 1;
+		}
+	}
+	if (target.posY != posY){
+		if (target.posY < posY && cellsPeople[posX][posY-1].exist == 0){
+			deltaY = -1;
+		}
+		else if (target.posY > posY && cellsPeople[posX][posY+1].exist == 0){
+			deltaY = 1;
+		}
+	}
+	
+	if (deltaX != 0 && deltaY != 0){
+		if (choise == 0){
+			direction.deltaX = deltaX;
+		}
+		else{
+			direction.deltaY = deltaY;
+		}
+	}
+	else if (deltaX != 0){
+		direction.deltaX = deltaX;
+	}
+	else if (deltaY != 0){
+		direction.deltaY = deltaY;
+	}
+	
+	return direction;
+}
+
+function updateCells(){
+	numPeople = listPeople.length;
+    for (k=0; k<numPeople; k++){
+		if (listPeople[k].life > 0){
+			//结算每回合消耗和收获，记录收获及时间的累计
+			listPeople[k].life += cellsSugar[listPeople[k].posX][listPeople[k].posY].volume - listPeople[k].consume;
+			listPeople[k].life = Math.min(listPeople[k].life, PEOPLE_INIT_LIFE)
+			listPeople[k].wealth += cellsSugar[listPeople[k].posX][listPeople[k].posY].volume;
+			listPeople[k].age += 1;
+			//寻找更高糖点
+			direction = findSugar(listPeople[k].posX, listPeople[k].posY, listPeople[k].vision);
+			if (CONTINUE_WHEN_BALANCE || cellsSugar[listPeople[k].posX][listPeople[k].posY].volume - listPeople[k].consume < 0){ //是否如果已经达到糖分平衡点，就停下来
+				cellsPeople[listPeople[k].posX][listPeople[k].posY].exist = 0;
+				cellsPeople[listPeople[k].posX][listPeople[k].posY].color = "white";
+				cellsPeople[listPeople[k].posX][listPeople[k].posY].id = -1;
+				listPeople[k].posX += direction.deltaX;
+				listPeople[k].posY += direction.deltaY;
+				cellsPeople[listPeople[k].posX][listPeople[k].posY].exist = 1;
+				cellsPeople[listPeople[k].posX][listPeople[k].posY].color = listPeople[k].color;
+				cellsPeople[listPeople[k].posX][listPeople[k].posY].id = listPeople[k].id;
+			}
+			if (ENABLE_OLD){
+				listPeople[k].life -= 1;
+			}
+		}
+		else{
+			cellsPeople[listPeople[k].posX][listPeople[k].posY].exist = 0;
+			cellsPeople[listPeople[k].posX][listPeople[k].posY].color = "white";
+			cellsPeople[listPeople[k].posX][listPeople[k].posY].id = -1;
+		}
+	}	
+}
+
+function startCa(){
+    initCells();
+	initSugar();
+    drawCells();
+    round = 0;
+	alive = 0;
+}
+
+function stepCa(){
+    updateCells();
+    drawCells();
+    round += 1;
+	alive = 0;
+	for (var k=0; k<listPeople.length; k++){
+		//console.log(k, listPeople[k]);
+		if (listPeople[k].life > 0){
+			alive += 1;
+		}
+	}
+	console.log(alive);
+    document.getElementById("round").innerHTML = "回合： " + round.toString();
+	document.getElementById("alive").innerHTML = "存活： " + alive.toString();
+}
+
+function autoCa(){
+    if (timer == undefined){
+        timer = setInterval(function(){ stepCa() }, TIME_INTERVAL);
+    }
+    else{
+        clearInterval(timer);
+        timer = undefined;
+    }
+}
+
+function updateCa(){
+	updatePeople();
+	drawCells();
+}
+</script>
+
+</body>
+</html>
